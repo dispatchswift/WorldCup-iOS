@@ -8,13 +8,31 @@
 import UIKit
 import CoreData
 
+/*
+Key Points
+
+- NSFetchedResultsController abstracts away most of the code needed to synchronize
+  a table view with a Core Data store.
+- At its core, NSFetchedResultsController is a wrapper around an NSFetchRequest and a
+  container for its fetched results.
+- A fetched results controller requires settings at least one sort descriptor on its fetch request.
+  If you forget the sort descriptor, your app will crash.
+- You can set a fetched result's controller sectionNameKeyPath to specify an attribute to group
+  the results into table view sections. Each unique value corresponds to a different table view section.
+*/
 class TeamsViewController: UIViewController {
 	
 	// MARK: - Properties
 	
+	/*
+	UITableViewDiffabledataSource is a generic for two types - String to represent section identifiers
+	and NSManagedobjectID to represent the managed object identifiers of the different teams.
+	*/
+	private var dataSource: UITableViewDiffableDataSource<String, NSManagedObjectID>?
+	
 	lazy var tableView: UITableView = {
 		let tableView = UITableView()
-		tableView.dataSource = self
+//		tableView.dataSource = self
 		tableView.delegate = self
 		tableView.register(TeamTableViewCell.self, forCellReuseIdentifier: TeamTableViewCell.identifier)
 		return tableView
@@ -112,19 +130,10 @@ class TeamsViewController: UIViewController {
 		importJSONDataIfNeeded()
 		
 		/*
-		Here you execute the fetch request. If there's an error, you log the error to the console.
-		
-		But wait a minute... where are your fetched results? While fetching with NSFetchRequest returns
-		an array of results, fetching with NSFetchedResultsController doesn't return anything.
-		
-		NSFetchedResultsController is both a wrapper around a fetch request and a container for its fetched results.
-		You can get them either with the fetchedObjects property or the object(at:) method.
+		In the previous setup, the table view's data source was the view controller. The table view data
+		source is now the diffable data source object that you set up earlier.
 		*/
-		do {
-			try fetchedResultsController.performFetch()
-		} catch let error as NSError {
-			print("Fetching error: \(error), \(error.userInfo)")
-		}
+		dataSource = setupDataSource()
 	}
 	
 	override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
@@ -151,6 +160,35 @@ class TeamsViewController: UIViewController {
 		super.viewDidLayoutSubviews()
 		
 		tableView.frame = view.bounds
+	}
+	
+	override func viewDidAppear(_ animated: Bool) {
+		super.viewDidAppear(animated)
+		
+		/*
+		Here you execute the fetch request. If there's an error, you log the error to the console.
+		
+		But wait a minute... where are your fetched results? While fetching with NSFetchRequest returns
+		an array of results, fetching with NSFetchedResultsController doesn't return anything.
+		
+		NSFetchedResultsController is both a wrapper around a fetch request and a container for its fetched results.
+		You can get them either with the fetchedObjects property or the object(at:) method.
+		*/
+		do {
+			/*
+			Now you're using a diffable data source, and the first change happens when you call performFetch() on
+			the results controller, which in turn calls controller(_: didChangeContentWith:), which "adds" in all of
+			the rows from the first fetch. You call performFetch() in viewDidLoad(), which happens before the view is
+			added to the window.
+			
+			To fix this, you need to perform the fetch later on. Remove the do/catch statement from viewDidLoad(),
+			since that's now happening too early in the lifecycle. Implement viewDidAppear(_:), which is called after the
+			view is added to the window.
+			*/
+			try fetchedResultsController.performFetch()
+		} catch let error as NSError {
+			print("Fetching error: \(error), \(error.userInfo)")
+		}
 	}
 	
 }
@@ -242,67 +280,32 @@ extension TeamsViewController {
 		}
 	}
 	
-}
-
-// MARK: - UITableViewDataSource
-extension TeamsViewController: UITableViewDataSource {
-	
-	func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-		/*
-		The number of rows in each table view section corresponds to the number of objects in each fetched results
-		controller section. You can query information about a fetched results controller section through its sections
-		property.
-		
-		Note: The sections array contains opaque objects that implement the NSFetchedResultsSectionInfo protocol.
-		This lightweight protocol provides information about a section, such as its title and number of objects.
-		*/
-		guard let sectionInfo = fetchedResultsController.sections?[section] else {
-			return 0
+		func configureCell(cell: UITableViewCell, for team: Team) {
+			guard let cell = cell as? TeamTableViewCell else {
+				return
+			}
+			
+			cell.teamLabel.text = team.teamName
+			cell.scoreLabel.text = "Wins: \(team.wins)"
+			
+			if let imageName = team.imageName {
+				cell.flagImageView.image = UIImage(named: imageName)
+			} else {
+				cell.flagImageView.image = nil
+			}
 		}
-		
-		return sectionInfo.numberOfObjects
-	}
 	
-	func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-		let cell = tableView.dequeueReusableCell(withIdentifier: TeamTableViewCell.identifier, for: indexPath) as! TeamTableViewCell
-		configureCell(cell: cell, for: indexPath)
-		return cell
-	}
-	
-	func numberOfSections(in tableView: UITableView) -> Int {
-		/*
-		The number of sections in the table view corresponds to the number of sections in the fetched
-		results controller. You may be wondering how this table view can have more than one section. Aren't
-		you simply fetching and displaying all items?
-		
-		That's correct. You will only have one section, but keep in mind that NSFetchedResultsController can
-		split up your data into sections. You can query information about a fetched results controller section
-		through its sections property.
-		*/
-		return fetchedResultsController.sections?.count ?? 0
-	}
-	
-	func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-		let sectionInfo = fetchedResultsController.sections?[section]
-		return sectionInfo?.name
-	}
-	
-	func configureCell(cell: TeamTableViewCell, for indexPath: IndexPath) {
-		/*
-		You use the index path to grab the corresponding Team object from the fetched results controller. Next, you use
-		the Team object to populate the cell's flag image, team name, and score label.
-		
-		Notice again there's no array variable holding your teams. They're all stored inside the fetched results controller
-		and you process them via object(at:).
-		*/
-		let team = fetchedResultsController.object(at: indexPath)
-		cell.teamLabel.text = team.teamName
-		cell.scoreLabel.text = "Wins: \(team.wins)"
-		
-		if let imageName = team.imageName {
-			cell.flagImageView.image = UIImage(named: imageName)
-		} else {
-			cell.flagImageView.image = nil
+	func setupDataSource() -> UITableViewDiffableDataSource<String, NSManagedObjectID> {
+		UITableViewDiffableDataSource(
+			tableView: tableView
+		) { [unowned self] tableView, indexPath, managedObjectID in
+			let cell = tableView.dequeueReusableCell(withIdentifier: TeamTableViewCell.identifier, for: indexPath)
+			
+			if let team = try? coreDataStack.managedContext.existingObject(with: managedObjectID) as? Team {
+				self.configureCell(cell: cell, for: team)
+			}
+			
+			return cell
 		}
 	}
 	
@@ -322,63 +325,52 @@ extension TeamsViewController: UITableViewDelegate {
 		*/
 		let team = fetchedResultsController.object(at: indexPath)
 		team.wins += 1
+		
+		/*
+		Here, you get the existing snapshot, tell it that your team needs reloading, then apply the updated
+		snapshot back to the data source. The data source will then reload the cell for your team. When you save
+		the context, that will trigger the fetched results controller's delegate method, which will apply any reording
+		that needs to happen.
+		*/
+		if var snapshot = dataSource?.snapshot() {
+			snapshot.reloadItems([team.objectID])
+			dataSource?.apply(snapshot, animatingDifferences: false, completion: nil)
+		}
+		
 		coreDataStack.saveContext()
+	}
+	
+	func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+		let sectionInfo = fetchedResultsController.sections?[section]
+		
+		let titleLabel = UILabel()
+		titleLabel.text = sectionInfo?.name
+		
+		return titleLabel
+	}
+	
+	func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+		return 20
 	}
 	
 }
 
 // MARK: - NSFetchedResultsControllerDelegate
 extension TeamsViewController: NSFetchedResultsControllerDelegate {
+
+	/*
+	The old delegate methods you deleted told you when the changes were about to happen, what the changes were, and
+	when the changes completed.
 	
-	func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-		tableView.beginUpdates()
-	}
+	These delegate calls lined up nicely with methods in UITableView such as beginUpdates() and endUpdates(), which
+	you no longer need to call because you made the switch to diffable data sources.
 	
+	Instead, the new delegate method gives you a summary of any changes to the fetched result set
+	and passes you a pre-computed snapshot that you can apply directly to your table view. So much simpler!
+	*/
 	func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
-									didChange anObject: Any,
-									at indexPath: IndexPath?,
-									for type: NSFetchedResultsChangeType,
-									newIndexPath: IndexPath?) {
-		switch type {
-		case .insert:
-			tableView.insertRows(at: [newIndexPath!], with: .automatic)
-			
-		case .delete:
-			tableView.deleteRows(at: [indexPath!], with: .automatic)
-			
-		case .update:
-			let cell = tableView.cellForRow(at: indexPath!) as! TeamTableViewCell
-			configureCell(cell: cell, for: indexPath!)
-			
-		case .move:
-			tableView.deleteRows(at: [indexPath!], with: .automatic)
-			tableView.insertRows(at: [newIndexPath!], with: .automatic)
-			
-		@unknown default:
-			print("Unexpected NSFetchedResultsChangeType")
-		}
+									didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) {
+		let snapshot = snapshot as NSDiffableDataSourceSnapshot<String, NSManagedObjectID>
+		dataSource?.apply(snapshot)
 	}
-	
-	func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
-									didChange sectionInfo: NSFetchedResultsSectionInfo,
-									atSectionIndex sectionIndex: Int,
-									for type: NSFetchedResultsChangeType) {
-		let indexSet = IndexSet(integer: sectionIndex)
-		
-		switch type {
-		case .insert:
-			tableView.insertSections(indexSet, with: .automatic)
-			
-		case .delete:
-			tableView.deleteSections(indexSet, with: .automatic)
-			
-		default:
-			break
-		}
-	}
-	
-	func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-		tableView.endUpdates()
-	}
-	
 }
