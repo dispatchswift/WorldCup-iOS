@@ -66,14 +66,14 @@
 		C8AD923826FFF205007F93B5 /* World Cup */ = {
 			isa = PBXGroup;
 			children = (
+				C8AD924726FFF209007F93B5 /* Info.plist */,
 				C8AD923926FFF205007F93B5 /* AppDelegate.swift */,
+				C8AD924F26FFF25B007F93B5 /* CoreDataStack.swift */,
 				C8AD923B26FFF205007F93B5 /* SceneDelegate.swift */,
 				C8AD924E26FFF246007F93B5 /* Controllers */,
 				C8AD925B26FFF784007F93B5 /* Models */,
-				C8AD925326FFF3C5007F93B5 /* Views */,
 				C8AD924D26FFF242007F93B5 /* Resources */,
-				C8AD924726FFF209007F93B5 /* Info.plist */,
-				C8AD924F26FFF25B007F93B5 /* CoreDataStack.swift */,
+				C8AD925326FFF3C5007F93B5 /* Views */,
 				C8AD925826FFF773007F93B5 /* World_Cup.xcdatamodeld */,
 			);
 			path = "World Cup";
@@ -84,6 +84,7 @@
 			children = (
 				C8AD924226FFF209007F93B5 /* Assets.xcassets */,
 				C8AD924426FFF209007F93B5 /* LaunchScreen.storyboard */,
+				C8AD926626FFFF27007F93B5 /* Teams.json */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -92,7 +93,6 @@
 			isa = PBXGroup;
 			children = (
 				C8AD925126FFF284007F93B5 /* TeamsViewController.swift */,
-				C8AD926626FFFF27007F93B5 /* Teams.json */,
 			);
 			path = Controllers;
 			sourceTree = "<group>";
