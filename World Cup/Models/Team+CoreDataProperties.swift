@@ -1,0 +1,29 @@
+//
+//  Team+CoreDataProperties.swift
+//  World Cup
+//
+//  Created by Cleopatra on 9/25/21.
+//
+//
+
+import Foundation
+import CoreData
+
+
+extension Team {
+
+    @nonobjc public class func fetchRequest() -> NSFetchRequest<Team> {
+        return NSFetchRequest<Team>(entityName: "Team")
+    }
+
+    @NSManaged public var imageName: String?
+    @NSManaged public var losses: Int32
+    @NSManaged public var qualifyingZone: String?
+    @NSManaged public var wins: Int32
+    @NSManaged public var teamName: String?
+
+}
+
+extension Team : Identifiable {
+
+}
