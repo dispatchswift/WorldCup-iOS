@@ -84,6 +84,18 @@ class TeamsViewController: UIViewController {
 			cacheName: nil
 		)
 		
+		/*
+		NSFetchedResultsController can listen for changes in its result set and notify its delegate,
+		NSFetchedResultsControllerDelegate. You can use this delegate to refresh the table view as needed anytime
+		the underlying data changes.
+		
+		Note: A fetched results controller can only monitor changes made via the managed object context specified
+		in its initializer. If you create a separate NSManagedObjectContext somewhere else in your app and start making
+		changes there, your delegate method won't run until those changes have been saved and merged with the fetched
+		results controller's context.
+		*/
+		fetchedResultsController.delegate = self
+		
 		return fetchedResultsController
 	}()
 	
@@ -200,24 +212,7 @@ extension TeamsViewController: UITableViewDataSource {
 	
 	func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
 		let cell = tableView.dequeueReusableCell(withIdentifier: TeamTableViewCell.identifier, for: indexPath) as! TeamTableViewCell
-		
-		/*
-		You use the index path to grab the corresponding Team object from the fetched results controller. Next, you use
-		the Team object to populate the cell's flag image, team name, and score label.
-		
-		Notice again there's no array variable holding your teams. They're all stored inside the fetched results controller
-		and you process them via object(at:).
-		*/
-		let team = fetchedResultsController.object(at: indexPath)
-		cell.teamLabel.text = team.teamName
-		cell.scoreLabel.text = "Wins: \(team.wins)"
-		
-		if let imageName = team.imageName {
-			cell.flagImageView.image = UIImage(named: imageName)
-		} else {
-			cell.flagImageView.image = nil
-		}
-		
+		configureCell(cell: cell, for: indexPath)
 		return cell
 	}
 	
@@ -239,6 +234,25 @@ extension TeamsViewController: UITableViewDataSource {
 		return sectionInfo?.name
 	}
 	
+	func configureCell(cell: TeamTableViewCell, for indexPath: IndexPath) {
+		/*
+		You use the index path to grab the corresponding Team object from the fetched results controller. Next, you use
+		the Team object to populate the cell's flag image, team name, and score label.
+		
+		Notice again there's no array variable holding your teams. They're all stored inside the fetched results controller
+		and you process them via object(at:).
+		*/
+		let team = fetchedResultsController.object(at: indexPath)
+		cell.teamLabel.text = team.teamName
+		cell.scoreLabel.text = "Wins: \(team.wins)"
+		
+		if let imageName = team.imageName {
+			cell.flagImageView.image = UIImage(named: imageName)
+		} else {
+			cell.flagImageView.image = nil
+		}
+	}
+	
 }
 
 // MARK: - UITableViewDelegate
@@ -256,8 +270,40 @@ extension TeamsViewController: UITableViewDelegate {
 		let team = fetchedResultsController.object(at: indexPath)
 		team.wins += 1
 		coreDataStack.saveContext()
-		tableView.reloadData()
 	}
 	
 }
 
+// MARK: - NSFetchedResultsControllerDelegate
+extension TeamsViewController: NSFetchedResultsControllerDelegate {
+	
+	func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+		tableView.beginUpdates()
+	}
+	
+	func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
+									didChange anObject: Any,
+									at indexPath: IndexPath?,
+									for type: NSFetchedResultsChangeType,
+									newIndexPath: IndexPath?) {
+		switch type {
+		case .insert:
+			tableView.insertRows(at: [newIndexPath!], with: .automatic)
+		case .delete:
+			tableView.deleteRows(at: [indexPath!], with: .automatic)
+		case .update:
+			let cell = tableView.cellForRow(at: indexPath!) as! TeamTableViewCell
+			configureCell(cell: cell, for: indexPath!)
+		case .move:
+			tableView.deleteRows(at: [indexPath!], with: .automatic)
+			tableView.insertRows(at: [newIndexPath!], with: .automatic)
+		@unknown default:
+			print("Unexpected NSFetchedResultsChangeType")
+		}
+	}
+	
+	func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+		tableView.endUpdates()
+	}
+	
+}
