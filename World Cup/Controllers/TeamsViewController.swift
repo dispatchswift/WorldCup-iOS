@@ -20,6 +20,8 @@ class TeamsViewController: UIViewController {
 		return tableView
 	}()
 	
+	private var addButton = UIBarButtonItem(systemItem: .add)
+	
 	lazy var coreDataStack = CoreDataStack(modelName: "World_Cup")
 	
 	lazy var fetchedResultsController: NSFetchedResultsController<Team> = {
@@ -125,10 +127,17 @@ class TeamsViewController: UIViewController {
 		}
 	}
 	
+	override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+		if motion == .motionShake {
+			addTeam()
+		}
+	}
+	
 	// MARK: - View Lifecycle Helpers
 	
 	private func setupNavigationBar() {
 		navigationItem.title = "World Cup"
+		navigationItem.rightBarButtonItem = addButton
 		navigationController?.navigationBar.prefersLargeTitles = true
 	}
 	
@@ -142,6 +151,50 @@ class TeamsViewController: UIViewController {
 		super.viewDidLayoutSubviews()
 		
 		tableView.frame = view.bounds
+	}
+	
+}
+
+// MARK: - Actions
+extension TeamsViewController {
+	
+	func addTeam() {
+		let alertController = UIAlertController(
+			title: "Secret Team",
+			message: "Add a new team",
+			preferredStyle: .alert
+		)
+		
+		alertController.addTextField { textField in
+			textField.placeholder = "Team Name"
+		}
+		
+		alertController.addTextField { textField in
+			textField.placeholder = "Qualifying Zone"
+		}
+		
+		let saveAction = UIAlertAction(
+			title: "Save",
+			style: .default
+		) { [unowned self] _ in
+			guard let nameTextField = alertController.textFields?.first,
+						let zoneTextField = alertController.textFields?.last else {
+				return
+			}
+			
+			let team = Team(context: self.coreDataStack.managedContext)
+			
+			team.teamName = nameTextField.text
+			team.qualifyingZone = zoneTextField.text
+			team.imageName = "wenderland-flag"
+			
+			self.coreDataStack.saveContext()
+		}
+		
+		alertController.addAction(saveAction)
+		alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+		
+		present(alertController, animated: true)
 	}
 	
 }
@@ -289,16 +342,38 @@ extension TeamsViewController: NSFetchedResultsControllerDelegate {
 		switch type {
 		case .insert:
 			tableView.insertRows(at: [newIndexPath!], with: .automatic)
+			
 		case .delete:
 			tableView.deleteRows(at: [indexPath!], with: .automatic)
+			
 		case .update:
 			let cell = tableView.cellForRow(at: indexPath!) as! TeamTableViewCell
 			configureCell(cell: cell, for: indexPath!)
+			
 		case .move:
 			tableView.deleteRows(at: [indexPath!], with: .automatic)
 			tableView.insertRows(at: [newIndexPath!], with: .automatic)
+			
 		@unknown default:
 			print("Unexpected NSFetchedResultsChangeType")
+		}
+	}
+	
+	func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>,
+									didChange sectionInfo: NSFetchedResultsSectionInfo,
+									atSectionIndex sectionIndex: Int,
+									for type: NSFetchedResultsChangeType) {
+		let indexSet = IndexSet(integer: sectionIndex)
+		
+		switch type {
+		case .insert:
+			tableView.insertSections(indexSet, with: .automatic)
+			
+		case .delete:
+			tableView.deleteSections(indexSet, with: .automatic)
+			
+		default:
+			break
 		}
 	}
 	
